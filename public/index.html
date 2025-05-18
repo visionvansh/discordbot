@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clipify Post - Bot Message Sender</title>
+  <style>
+    body { font-family: Arial; padding: 20px; background: #111; color: #eee; }
+    textarea, input, select { width: 100%; font-size: 16px; padding: 10px; margin-bottom: 10px; box-sizing: border-box; }
+    textarea { height: 100px; }
+    button { padding: 10px 20px; margin-top: 10px; background: #7289da; color: white; border: none; cursor: pointer; }
+    label { display: block; margin-top: 10px; }
+    .custom-field { border: 1px solid #444; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+    .remove-btn { background: #ff5555; padding: 5px 10px; margin-top: 5px; cursor: pointer; }
+    .placeholder-btn { background: #555; padding: 5px 10px; margin: 5px 0; cursor: pointer; }
+    .warning { color: #ff5555; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h2>📢 Send Message as Clipify Post</h2>
+  <form id="msgForm">
+    <label for="channelId">Channel ID (Where to send the message):</label>
+    <input type="text" id="channelId" placeholder="Enter the channel ID..." required>
+    <div class="warning">You can get the channel ID by enabling Developer Mode in Discord and right-clicking the channel to copy its ID.</div>
+
+    <label for="title">Embed Title (max 256 characters):</label>
+    <input type="text" id="title" placeholder="Enter the embed title..." required maxlength="256">
+    <div class="warning">Titles longer than 256 characters will be truncated.</div>
+
+    <label for="titleStyle">Title Style:</label>
+    <select id="titleStyle">
+      <option value="none">None</option>
+      <option value="bold">Bold</option>
+      <option value="italic">Italic</option>
+      <option value="bold-italic">Bold & Italic</option>
+    </select>
+
+    <label for="description">Description:</label>
+    <textarea id="description" placeholder="Enter the description..." required></textarea>
+
+    <label for="descriptionStyle">Description Style:</label>
+    <select id="descriptionStyle">
+      <option value="none">None</option>
+      <option value="bold">Bold</option>
+      <option value="italic">Italic</option>
+      <option value="bold-italic">Bold & Italic</option>
+    </select>
+
+    <label for="descriptionSize">Description Size (Visual Indicator):</label>
+    <select id="descriptionSize">
+      <option value="normal">Normal</option>
+      <option value="large">[Large]</option>
+      <option value="small">[Small]</option>
+    </select>
+
+    <label for="footer">Footer Text:</label>
+    <input type="text" id="footer" placeholder="Enter footer text..." required>
+
+    <label>Headings:</label>
+    <div id="customFields">
+      <!-- Custom fields will be added here dynamically -->
+    </div>
+    <button type="button" id="addFieldBtn">Add Heading</button>
+
+    <label for="buttonLabel">Button Label:</label>
+    <input type="text" id="buttonLabel" placeholder="Enter button label (e.g., Clip For Verseandme)" required>
+
+    <label for="buttonUrl">Button URL:</label>
+    <input type="text" id="buttonUrl" placeholder="Enter button URL (e.g., https://your-link)" required>
+
+    <button type="submit">Send</button>
+  </form>
+
+  <p id="status"></p>
+
+  <script>
+    const form = document.getElementById("msgForm");
+    const customFieldsDiv = document.getElementById("customFields");
+    const addFieldBtn = document.getElementById("addFieldBtn");
+    let fieldCount = 0;
+
+    addFieldBtn.addEventListener("click", () => {
+      fieldCount++;
+      const fieldDiv = document.createElement("div");
+      fieldDiv.className = "custom-field";
+      fieldDiv.innerHTML = `
+        <label for="heading${fieldCount}">Heading:</label>
+        <input type="text" id="heading${fieldCount}" name="heading${fieldCount}" placeholder="Enter heading..." required>
+
+        <label for="value${fieldCount}">Value:</label>
+        <textarea id="value${fieldCount}" name="value${fieldCount}" placeholder="Enter value (one per line)..." required></textarea>
+
+        <label for="valueStyle${fieldCount}">Value Style:</label>
+        <select id="valueStyle${fieldCount}">
+          <option value="none">None</option>
+          <option value="bold">Bold</option>
+          <option value="italic">Italic</option>
+          <option value="bold-italic">Bold & Italic</option>
+        </select>
+
+        <label for="valueSize${fieldCount}">Value Size (Visual Indicator):</label>
+        <select id="valueSize${fieldCount}">
+          <option value="normal">Normal</option>
+          <option value="large">[Large]</option>
+          <option value="small">[Small]</option>
+        </select>
+
+        <div>
+          <button type="button" class="placeholder-btn" onclick="document.getElementById('value${fieldCount}').value='[Click here](https://your-link)'>Insert Link Placeholder</button>
+          <button type="button" class="placeholder-btn" onclick="document.getElementById('value${fieldCount}').value='Sample content goes here!'">Insert Sample Text</button>
+        </div>
+
+        <button type="button" class="remove-btn">Remove</button>
+      `;
+      customFieldsDiv.appendChild(fieldDiv);
+
+      fieldDiv.querySelector(".remove-btn").addEventListener("click", () => {
+        customFieldsDiv.removeChild(fieldDiv);
+      });
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const channelId = document.getElementById("channelId").value;
+      const title = document.getElementById("title").value;
+      const titleStyle = document.getElementById("titleStyle").value;
+      const description = document.getElementById("description").value;
+      const descriptionStyle = document.getElementById("descriptionStyle").value;
+      const descriptionSize = document.getElementById("descriptionSize").value;
+      const footer = document.getElementById("footer").value;
+      const buttonLabel = document.getElementById("buttonLabel").value;
+      const buttonUrl = document.getElementById("buttonUrl").value;
+
+      const customFields = [];
+      const fieldDivs = customFieldsDiv.querySelectorAll(".custom-field");
+      fieldDivs.forEach((div, index) => {
+        const heading = div.querySelector(`#heading${index + 1}`).value;
+        const value = div.querySelector(`#value${index + 1}`).value;
+        const valueStyle = div.querySelector(`#valueStyle${index + 1}`).value;
+        const valueSize = div.querySelector(`#valueSize${index + 1}`).value;
+        customFields.push({ heading, value, valueStyle, valueSize });
+      });
+
+      const res = await fetch("/send-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId, title, titleStyle, description, descriptionStyle, descriptionSize, footer, customFields, buttonLabel, buttonUrl }),
+      });
+
+      const data = await res.json();
+      document.getElementById("status").textContent = data.success
+        ? "✅ Message sent successfully!"
+        : `❌ Failed to send message: ${data.error || "Unknown error"}`;
+    });
+  </script>
+</body>
+</html>
